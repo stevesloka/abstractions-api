@@ -7,8 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"database/sql"
+
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
+	_ "github.com/mattes/migrate/driver/mysql"
+	"github.com/mattes/migrate/migrate"
 )
 
 var (
@@ -26,13 +30,40 @@ func versionRoute(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	glog.V(4).Info("API is up and running!", time.Now())
+	fmt.Println("API is up and running!", time.Now())
 
 	// Configure router
 	router := mux.NewRouter().StrictSlash(true)
 
 	// Version
 	router.HandleFunc("/version", versionRoute)
+
+	// Configure MySQL
+	db, err := sql.Open("mysql", "root:password@(127.0.0.1:3306)/abstractions")
+	if err != nil {
+		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+	}
+	defer db.Close()
+
+	// Open doesn't open a connection. Validate DSN data:
+	err = db.Ping()
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	// Run Migrations
+	// use synchronous versions of migration functions ...
+	errors, ok := migrate.UpSync("mysql://root:password@(127.0.0.1:3306)/abstractions", "./db/migrations")
+	if !ok {
+		fmt.Println("Oh no ... migrations failed!")
+		// do sth with allErrors slice
+		for err := range errors {
+			fmt.Println(err)
+		}
+
+		fmt.Println(errors)
+		panic("Bailing out on running migrations!")
+	}
 
 	// Start server
 	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
