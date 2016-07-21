@@ -5,7 +5,7 @@
 .PHONY: all build container push clean test
 
 TAG = latest
-PREFIX = stevesloka
+PREFIX = localhost:5000/stevesloka
 
 all: container
 
