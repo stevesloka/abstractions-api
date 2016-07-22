@@ -22,6 +22,11 @@ import (
 
 var (
 	argListenPort = flag.Int("listen-port", 9080, "port to have API listen")
+	argDBUserName = flag.String("db-username", "root", "MySQL user used to connect to database")
+	argDBPassword = flag.String("db-password", "password", "MySQL user password used to connect to database")
+	argDBPort     = flag.String("db-port", "3306", "MySQL port used to connect to database")
+	argDBHost     = flag.String("db-host", "127.0.0.1", "MySQL host to connect")
+	argDBName     = flag.String("db-name", "abstractions", "MySQL database")
 	db            *sql.DB
 )
 
@@ -41,8 +46,11 @@ func versionRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func getJSON(sqlString string) (string, error) {
+
 	// Configure MySQL
-	db, err := sql.Open("mysql", "root:password@(127.0.0.1:3306)/abstractions")
+	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", *argDBUserName, *argDBPassword, *argDBHost, *argDBPort, *argDBName)
+
+	db, err := sql.Open("mysql", connectionDSN)
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 	}
@@ -121,7 +129,10 @@ func main() {
 	router.HandleFunc("/organizers", organizers)
 
 	// Configure MySQL
-	db, err := sql.Open("mysql", "root:password@(127.0.0.1:3306)/abstractions")
+	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", *argDBUserName, *argDBPassword, *argDBHost, *argDBPort, *argDBName)
+
+	// Configure MySQL
+	db, err := sql.Open("mysql", connectionDSN)
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 	}
@@ -135,7 +146,7 @@ func main() {
 
 	// Run Migrations
 	// use synchronous versions of migration functions ...
-	errors, ok := migrate.UpSync("mysql://root:password@(127.0.0.1:3306)/abstractions", "./db/migrations")
+	errors, ok := migrate.UpSync(fmt.Sprintf("mysql://%s", connectionDSN), "./db/migrations")
 	if !ok {
 		fmt.Println("Oh no ... migrations failed!")
 		// do sth with allErrors slice
