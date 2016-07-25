@@ -11,22 +11,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/stevesloka/abstractions-api/healthz"
 
 	"database/sql"
 
 	"github.com/gorilla/mux"
 	_ "github.com/mattes/migrate/driver/mysql"
-	"github.com/mattes/migrate/migrate"
 )
 
 var (
-	argListenPort = flag.Int("listen-port", 9080, "port to have API listen")
-	argDBUserName = flag.String("db-username", "root", "MySQL user used to connect to database")
-	argDBPassword = flag.String("db-password", "password", "MySQL user password used to connect to database")
-	argDBPort     = flag.String("db-port", "3306", "MySQL port used to connect to database")
-	argDBHost     = flag.String("db-host", "127.0.0.1", "MySQL host to connect")
-	argDBName     = flag.String("db-name", "abstractions", "MySQL database")
+	argListenPort = flag.Int("listen-port", 8080, "port to have API listen")
+	argDBUserName = os.Getenv("DATABASE_USERNAME")
+	argDBPassword = os.Getenv("DATABASE_PASSWORD")
+	argDBPort     = os.Getenv("DATABASE_PORT")
+	argDBHost     = os.Getenv("DATABASE_HOST")
+	argDBName     = os.Getenv("DATABASE_NAME")
 	db            *sql.DB
 )
 
@@ -48,7 +50,7 @@ func versionRoute(w http.ResponseWriter, r *http.Request) {
 func getJSON(sqlString string) (string, error) {
 
 	// Configure MySQL
-	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", *argDBUserName, *argDBPassword, *argDBHost, *argDBPort, *argDBName)
+	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", argDBUserName, argDBPassword, argDBHost, argDBPort, argDBName)
 
 	db, err := sql.Open("mysql", connectionDSN)
 	if err != nil {
@@ -117,46 +119,93 @@ func getJSON(sqlString string) (string, error) {
 	return string(jsonData), nil
 }
 
+func validateEnvVariables() {
+	if argDBUserName == "" {
+		argDBUserName = "root"
+	}
+
+	if argDBPassword == "" {
+		argDBPassword = "password"
+	}
+
+	if argDBPort == "" {
+		argDBPort = "3306"
+	}
+
+	if argDBHost == "" {
+		argDBHost = "127.0.0.1"
+	}
+
+	if argDBName == "" {
+		argDBName = "abstractions"
+	}
+}
+
 func main() {
 	flag.Parse()
-	fmt.Println("API is up and running!", time.Now())
+	log.Println("API is up and running!", time.Now())
+
+	// Validated environment vars and set defaults if needed
+	validateEnvVariables()
 
 	// Configure router
 	router := mux.NewRouter().StrictSlash(true)
 
-	// Version
+	// Routes
 	router.HandleFunc("/version", versionRoute)
 	router.HandleFunc("/organizers", organizers)
 
-	// Configure MySQL
-	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", *argDBUserName, *argDBPassword, *argDBHost, *argDBPort, *argDBName)
-
-	// Configure MySQL
-	db, err := sql.Open("mysql", connectionDSN)
+	// Get hostname
+	hostname, err := os.Hostname()
 	if err != nil {
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		log.Fatal(err)
 	}
-	defer db.Close()
 
-	// Open doesn't open a connection. Validate DSN data:
-	err = db.Ping()
+	// Configure MySQL
+	connectionDSN := fmt.Sprintf("%s:%s@(%s:%s)/%s", argDBUserName, argDBPassword, argDBHost, argDBPort, argDBName)
+
+	hc := &healthz.Config{
+		Hostname: hostname,
+		Database: healthz.DatabaseConfig{
+			DriverName:     "mysql",
+			DataSourceName: connectionDSN,
+		},
+	}
+
+	healthzHandler, err := healthz.Handler(hc)
 	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
+		log.Fatal(err)
 	}
 
-	// Run Migrations
-	// use synchronous versions of migration functions ...
-	errors, ok := migrate.UpSync(fmt.Sprintf("mysql://%s", connectionDSN), "./db/migrations")
-	if !ok {
-		fmt.Println("Oh no ... migrations failed!")
-		// do sth with allErrors slice
-		for err := range errors {
-			fmt.Println(err)
-		}
+	// Add healthz to routes
+	router.Handle("/healthz", healthzHandler)
 
-		fmt.Println(errors)
-		panic("Bailing out on running migrations!")
-	}
+	// // Configure MySQL
+	// db, err := sql.Open("mysql", connectionDSN)
+	// if err != nil {
+	// 	panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+	// }
+	// defer db.Close()
+	//
+	// // Open doesn't open a connection. Validate DSN data:
+	// err = db.Ping()
+	// if err != nil {
+	// 	panic(err.Error()) // proper error handling instead of panic in your app
+	// }
+	//
+	// // Run Migrations
+	// // use synchronous versions of migration functions ...
+	// errors, ok := migrate.UpSync(fmt.Sprintf("mysql://%s", connectionDSN), "./db/migrations")
+	// if !ok {
+	// 	log.Println("Oh no ... migrations failed!")
+	// 	// do sth with allErrors slice
+	// 	for err := range errors {
+	// 		log.Println(err)
+	// 	}
+	//
+	// 	log.Println(errors)
+	// 	panic("Bailing out on running migrations!")
+	// }
 
 	// Start server
 	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))

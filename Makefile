@@ -10,7 +10,7 @@ PREFIX = localhost:5000/stevesloka
 all: container
 
 build: main.go
-	GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -a -installsuffix cgo -o restapi --ldflags '-w' ./main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo -o restapi --ldflags '-w' ./main.go
 
 container: build
 	docker build -t $(PREFIX)/abstractions-api:$(TAG) .
