@@ -20,16 +20,18 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/mattes/migrate/driver/mysql"
+	"github.com/mattes/migrate/migrate"
 )
 
 var (
-	argListenPort = flag.Int("listen-port", 8080, "port to have API listen")
-	argDBUserName = os.Getenv("DATABASE_USERNAME")
-	argDBPassword = os.Getenv("DATABASE_PASSWORD")
-	argDBPort     = os.Getenv("DATABASE_PORT")
-	argDBHost     = os.Getenv("DATABASE_HOST")
-	argDBName     = os.Getenv("DATABASE_NAME")
-	db            *sql.DB
+	argListenPort    = flag.Int("listen-port", 80, "port to have API listen")
+	argTLSListenPort = flag.Int("tls-listen-port", 9443, "port to have API listen over TLS")
+	argDBUserName    = os.Getenv("DATABASE_USERNAME")
+	argDBPassword    = os.Getenv("DATABASE_PASSWORD")
+	argDBPort        = os.Getenv("DATABASE_PORT")
+	argDBHost        = os.Getenv("DATABASE_HOST")
+	argDBName        = os.Getenv("DATABASE_NAME")
+	db               *sql.DB
 )
 
 const (
@@ -143,17 +145,10 @@ func validateEnvVariables() {
 
 func main() {
 	flag.Parse()
-	log.Println("API is up and running!", time.Now())
+	log.Println("API is up and running!", time.Now(), " running on port: ", *argListenPort)
 
 	// Validated environment vars and set defaults if needed
 	validateEnvVariables()
-
-	// Configure router
-	router := mux.NewRouter().StrictSlash(true)
-
-	// Routes
-	router.HandleFunc("/version", versionRoute)
-	router.HandleFunc("/organizers", organizers)
 
 	// Get hostname
 	hostname, err := os.Hostname()
@@ -177,36 +172,68 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Add healthz to routes
+	// Configure router
+	router := mux.NewRouter().StrictSlash(true)
+
+	// Routes
+	router.HandleFunc("/version", versionRoute)
+	router.HandleFunc("/organizers", organizers)
 	router.Handle("/healthz", healthzHandler)
 
-	// // Configure MySQL
-	// db, err := sql.Open("mysql", connectionDSN)
-	// if err != nil {
-	// 	panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
-	// }
-	// defer db.Close()
-	//
-	// // Open doesn't open a connection. Validate DSN data:
-	// err = db.Ping()
-	// if err != nil {
-	// 	panic(err.Error()) // proper error handling instead of panic in your app
-	// }
-	//
-	// // Run Migrations
-	// // use synchronous versions of migration functions ...
-	// errors, ok := migrate.UpSync(fmt.Sprintf("mysql://%s", connectionDSN), "./db/migrations")
-	// if !ok {
-	// 	log.Println("Oh no ... migrations failed!")
-	// 	// do sth with allErrors slice
-	// 	for err := range errors {
-	// 		log.Println(err)
-	// 	}
-	//
-	// 	log.Println(errors)
-	// 	panic("Bailing out on running migrations!")
-	// }
+	// Start insecure server
+	go func() {
+		err_http := http.ListenAndServe(fmt.Sprintf(":%d", *argListenPort), router)
+		if err_http != nil {
+			log.Fatal("Web server (HTTP): ", err_http)
+		}
+	}()
 
-	// Start server
-	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argListenPort), "certs/cert.pem", "certs/key.pem", router))
+	canConnect := true
+
+	// Configure MySQL
+	db, err := sql.Open("mysql", connectionDSN)
+	if err != nil {
+		canConnect = false
+	}
+	defer db.Close()
+
+	// Open doesn't open a connection. Validate DSN data:
+	err = db.Ping()
+	if err != nil {
+		canConnect = false
+	}
+
+	for canConnect == false {
+		time.Sleep(time.Second * 3)
+
+		// Configure MySQL
+		db, err := sql.Open("mysql", connectionDSN)
+		defer db.Close()
+
+		// Open doesn't open a connection. Validate DSN data:
+		err = db.Ping()
+		if err == nil {
+			canConnect = true
+		}
+	}
+
+	// Run Migrations
+	// use synchronous versions of migration functions ...
+	log.Println("About to run migrations....")
+	errors, ok := migrate.UpSync(fmt.Sprintf("mysql://%s", connectionDSN), "./db/migrations")
+	if !ok {
+		log.Println("Oh no ... migrations failed!")
+		// do sth with allErrors slice
+		for err := range errors {
+			log.Println(err)
+		}
+
+		log.Println(errors)
+		panic("Bailing out on running migrations!")
+	}
+
+	log.Println("Migrations run!")
+
+	// Start secure server
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", *argTLSListenPort), "certs/cert.pem", "certs/key.pem", router))
 }

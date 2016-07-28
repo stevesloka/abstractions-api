@@ -11,6 +11,7 @@ type DatabaseChecker struct {
 }
 
 func NewDatabaseChecker(driverName, dataSourceName string) (*DatabaseChecker, error) {
+
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, err
@@ -19,9 +20,15 @@ func NewDatabaseChecker(driverName, dataSourceName string) (*DatabaseChecker, er
 }
 
 func (dc *DatabaseChecker) Ping() error {
+
 	err := dc.db.Ping()
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
+//
+// func (dc *DatabaseChecker) ValidateMigrations() error {
+// 	dc.db.
+// }

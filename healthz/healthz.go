@@ -25,6 +25,7 @@ type handler struct {
 }
 
 func Handler(hc *Config) (http.Handler, error) {
+
 	dc, err := NewDatabaseChecker(hc.Database.DriverName, hc.Database.DataSourceName)
 	if err != nil {
 		return nil, err
@@ -57,6 +58,7 @@ type Error struct {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
 	response := Response{
 		Hostname: h.hostname,
 		Metadata: h.metadata,
@@ -75,6 +77,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Errors = errors
+
 	if len(response.Errors) > 0 {
 		statusCode = http.StatusInternalServerError
 		for _, e := range response.Errors {
