@@ -1,7 +1,9 @@
-INSERT INTO organizer (first_name, last_name) VALUES ('Andrew', 'Shafer');
-INSERT INTO organizer (first_name, last_name) VALUES ('Chris', 'Luciano');
+INSERT INTO organizer (first_name, last_name) VALUES ('Justin', 'Reese');
 INSERT INTO organizer (first_name, last_name) VALUES ('Colin', 'Dean');
-INSERT INTO organizer (first_name, last_name) VALUES ('Daniel', 'Buch');
-INSERT INTO organizer (first_name, last_name) VALUES ('Roy', 'Liu');
-INSERT INTO organizer (first_name, last_name) VALUES ('Seth', 'Vargo');
-INSERT INTO organizer (first_name, last_name) VALUES ('Jennifer', 'Manning')
+INSERT INTO organizer (first_name, last_name) VALUES ('Erik', 'Swanson');
+INSERT INTO organizer (first_name, last_name) VALUES ('Anna', 'Filippova');
+INSERT INTO organizer (first_name, last_name) VALUES ('Matthew', 'Beatty');
+INSERT INTO organizer (first_name, last_name) VALUES ('Jenny', 'Manning');
+INSERT INTO organizer (first_name, last_name) VALUES ('Christopher', 'Luciano');
+INSERT INTO organizer (first_name, last_name) VALUES ('Emma', 'Trimble');
+INSERT INTO organizer (first_name, last_name) VALUES ('Jean', 'Lange');
