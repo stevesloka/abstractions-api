@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 
 	"database/sql"
 
+	gorilla "github.com/gorilla/http"
 	"github.com/gorilla/mux"
 	_ "github.com/mattes/migrate/driver/mysql"
 	"github.com/mattes/migrate/migrate"
@@ -38,10 +40,24 @@ const (
 	appVersion = "0.0.1"
 )
 
+type test_struct struct {
+	Test string
+}
+
 // Organizers (GET "/organizers")
 func organizers(w http.ResponseWriter, r *http.Request) {
 	result, _ := getJSON("SELECT * FROM organizer")
 	fmt.Fprintf(w, result)
+}
+
+// Organizers (GET "/sessions")
+func sessions(w http.ResponseWriter, r *http.Request) {
+	buf := new(bytes.Buffer)
+	if _, err := gorilla.Get(buf, "http://abstractions.io/api/schedule.json"); err != nil {
+		log.Fatalf("could not fetch: %v", err)
+	}
+
+	fmt.Fprintf(w, buf.String())
 }
 
 // Version (GET "/version")
@@ -178,6 +194,7 @@ func main() {
 	// Routes
 	router.HandleFunc("/version", versionRoute)
 	router.HandleFunc("/organizers", organizers)
+	router.HandleFunc("/sessions", sessions)
 	router.Handle("/healthz", healthzHandler)
 
 	// Start insecure server
